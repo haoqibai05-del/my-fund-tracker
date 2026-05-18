@@ -3,70 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>极简美股估值</title>
-    <!-- 引入 ECharts -->
-    <script src="https://cdn.staticfile.net/echarts/5.5.0/echarts.min.js"></script>
+    <title>纳指信息小助手 - 实时版</title>
     <style>
-        body { font-family: sans-serif; padding: 15px; background-color: #f5f7fa; color: #333; }
-        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .up { color: #f56c6c; font-weight: bold; }
-        .down { color: #67c23a; font-weight: bold; }
-        .time-text { font-size: 12px; color: #909399; }
+        /* 仿造截图的暗黑质感风格 */
+        body { font-family: -apple-system, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 15px; }
+        .header-panel { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .index-box { background: #1e1e1e; padding: 10px; border-radius: 8px; text-align: center; width: 23%; font-size: 14px; }
+        .up { color: #ff4d4f; }
+        .down { color: #00e676; }
+        .fund-list { background: #1e1e1e; border-radius: 12px; padding: 10px; }
+        .fund-item { display: flex; justify-content: space-between; padding: 15px 10px; border-bottom: 1px solid #333; font-size: 15px; }
+        .fund-item:last-child { border-bottom: none; }
+        .time-hint { text-align: center; font-size: 12px; color: #888; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2>实时估算面板</h2>
-        <p class="time-text" id="updateTime">最后更新：读取中...</p>
-        
-        <div id="dataList" style="margin-top: 15px; line-height: 1.8;">
-            <!-- 数据将通过 JS 渲染到这里 -->
-        </div>
+    <div class="header-panel" id="topIndices">
+        <div class="index-box">纳指100<br><span id="val-ndx">--</span></div>
+        <div class="index-box">标普500<br><span id="val-spx">--</span></div>
+        <div class="index-box">标普等权<br><span id="val-spxew">--</span></div>
+        <div class="index-box">USD/CNY<br><span id="val-cny">--</span></div>
     </div>
 
-    <div class="card">
-        <!-- 图表容器 -->
-        <div id="chartBox" style="width: 100%; height: 350px;"></div>
-    </div>
+    <div class="time-hint" id="updateTime">美股盘中，数据加载中...</div>
+
+    <div class="fund-list" id="fundContainer">
+        </div>
 
     <script>
-        // 读取同目录下的 data.json
-        fetch('./data.json')
-            .then(res => res.json())
-            .then(data => {
-                // 1. 渲染文字数据
-                document.getElementById('updateTime').innerText = `最后更新：${data.updateTime}`;
-                
-                const formatHtml = (item) => {
-                    let color = item.changePercent >= 0 ? 'up' : 'down';
-                    let sign = item.changePercent > 0 ? '+' : '';
-                    return `<div><b>${item.name}</b>: ${item.points} 点 | <span class="${color}">${sign}${item.changePercent}%</span></div>`;
-                };
+        // 核心配置：你可以随时在这里添加几十个基金！
+        // baseIndex: 对应上面抓取的底层指数代码
+        // weight: 基金的平均仓位（通常QDII是0.95即95%）
+        const fundList = [
+            { name: "天弘纳斯达克100", baseIndex: "^NDX", weight: 0.95 },
+            { name: "广发纳斯达克100", baseIndex: "^NDX", weight: 0.94 },
+            { name: "景顺长城纳斯达克科技", baseIndex: "^NDX", weight: 0.95 }, // 严格来说跟踪科技指数，这里做演示
+            { name: "易方达标普信息科技", baseIndex: "^GSPC", weight: 0.95 }, // 演示：关联标普500
+            { name: "标普500等权重ETF (演示)", baseIndex: "^SPXEW", weight: 0.95 }
+        ];
 
-                let listHtml = formatHtml(data.nasdaq100) + formatHtml(data.sp500ew) + formatHtml(data.exchangeRate);
-                document.getElementById('dataList').innerHTML = listHtml;
+        // 刷新数据的核心函数
+        async function fetchMarketData() {
+            try {
+                // 请求我们自己部署在 Vercel 上的 API
+                const res = await fetch('/api/market');
+                const result = await res.json();
+                const market = result.data;
 
-                // 2. 渲染 ECharts 柱状图
-                let myChart = echarts.init(document.getElementById('chartBox'));
-                let option = {
-                    title: { text: '今日涨跌幅概览', textStyle: { fontSize: 16 } },
-                    tooltip: { formatter: '{b}: {c}%' },
-                    xAxis: { type: 'category', data: ['纳指 100', '标普等权', '汇率'] },
-                    yAxis: { type: 'value', axisLabel: { formatter: '{value}%' } },
-                    series: [{
-                        type: 'bar',
-                        barWidth: '40%',
-                        data: [
-                            { value: data.nasdaq100.changePercent, itemStyle: { color: data.nasdaq100.changePercent >= 0 ? '#f56c6c' : '#67c23a' } },
-                            { value: data.sp500ew.changePercent, itemStyle: { color: data.sp500ew.changePercent >= 0 ? '#f56c6c' : '#67c23a' } },
-                            { value: data.exchangeRate.changePercent, itemStyle: { color: data.exchangeRate.changePercent >= 0 ? '#f56c6c' : '#67c23a' } }
-                        ]
-                    }]
+                document.getElementById('updateTime').innerHTML = `美股盘中，最后更新于 ${result.updateTime} (1分钟自动刷新)`;
+
+                // 1. 渲染顶部指数
+                const renderIndex = (id, symbol) => {
+                    const el = document.getElementById(id);
+                    const change = parseFloat(market[symbol].change);
+                    const color = change >= 0 ? 'up' : 'down';
+                    const sign = change > 0 ? '+' : '';
+                    el.innerHTML = `<span class="${color}">${sign}${change}%</span>`;
                 };
-                myChart.setOption(option);
-            })
-            .catch(err => console.error('读取数据失败:', err));
+                renderIndex('val-ndx', '^NDX');
+                renderIndex('val-spx', '^GSPC');
+                renderIndex('val-spxew', '^SPXEW');
+                renderIndex('val-cny', 'CNY=X');
+
+                // 2. 渲染基金列表（批量计算估值）
+                const cnyChange = parseFloat(market['CNY=X'].change);
+                let fundHtml = '';
+
+                fundList.forEach(fund => {
+                    // 核心估算公式：指数涨幅 * 仓位 + 汇率涨幅
+                    const indexChange = parseFloat(market[fund.baseIndex].change);
+                    let estChange = (indexChange * fund.weight) + cnyChange;
+                    
+                    const color = estChange >= 0 ? 'up' : 'down';
+                    const sign = estChange > 0 ? '+' : '';
+
+                    fundHtml += `
+                        <div class="fund-item">
+                            <span>${fund.name}</span>
+                            <span class="${color}">${sign}${estChange.toFixed(2)}% ></span>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('fundContainer').innerHTML = fundHtml;
+
+            } catch (err) {
+                console.error("刷新失败", err);
+            }
+        }
+
+        // 页面加载先执行一次
+        fetchMarketData();
+        // 设置定时器，每 60,000 毫秒（1分钟）自动拉取一次数据！
+        setInterval(fetchMarketData, 60000);
+
     </script>
 </body>
 </html>
