@@ -3,99 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>纳指信息小助手 - 实时版</title>
+    <title>Pro行情看板 - K线版</title>
+    <script src="https://cdn.staticfile.net/echarts/5.5.0/echarts.min.js"></script>
     <style>
-        /* 仿造截图的暗黑质感风格 */
         body { font-family: -apple-system, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 15px; }
-        .header-panel { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .index-box { background: #1e1e1e; padding: 10px; border-radius: 8px; text-align: center; width: 23%; font-size: 14px; }
+        /* 顶部 5 格布局 */
+        .top-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+        .index-box { background: #1e1e1e; padding: 15px 5px; border-radius: 8px; text-align: center; font-size: 14px; }
+        .index-name { color: #888; font-size: 12px; margin-bottom: 5px; }
         .up { color: #ff4d4f; }
         .down { color: #00e676; }
-        .fund-list { background: #1e1e1e; border-radius: 12px; padding: 10px; }
-        .fund-item { display: flex; justify-content: space-between; padding: 15px 10px; border-bottom: 1px solid #333; font-size: 15px; }
-        .fund-item:last-child { border-bottom: none; }
-        .time-hint { text-align: center; font-size: 12px; color: #888; margin-bottom: 10px; }
+        
+        /* 图表网格布局：PC端一行两个，手机端一行一个 */
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .chart-container { background: #1e1e1e; border-radius: 10px; padding: 10px; height: 300px; }
+        .time-hint { text-align: center; font-size: 12px; color: #888; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
-    <div class="header-panel" id="topIndices">
-        <div class="index-box">纳指100<br><span id="val-ndx">--</span></div>
-        <div class="index-box">标普500<br><span id="val-spx">--</span></div>
-        <div class="index-box">标普等权<br><span id="val-spxew">--</span></div>
-        <div class="index-box">USD/CNY<br><span id="val-cny">--</span></div>
+    <div class="time-hint" id="updateTime">盘中数据加载中...</div>
+
+    <div class="top-bar" id="topIndices">
+        <div class="index-box"><div class="index-name">纳指综合</div><div id="val-ixic">--</div></div>
+        <div class="index-box"><div class="index-name">纳斯达克100</div><div id="val-ndx">--</div></div>
+        <div class="index-box"><div class="index-name">标普500</div><div id="val-spx">--</div></div>
+        <div class="index-box"><div class="index-name">标普等权</div><div id="val-spxew">--</div></div>
+        <div class="index-box"><div class="index-name">USD/CNH</div><div id="val-cnh">--</div></div>
     </div>
 
-    <div class="time-hint" id="updateTime">美股盘中，数据加载中...</div>
-
-    <div class="fund-list" id="fundContainer">
-        </div>
+    <div class="charts-grid">
+        <div class="chart-container" id="chart-ndx"></div>
+        <div class="chart-container" id="chart-spx"></div>
+        <div class="chart-container" id="chart-spxew"></div>
+        <div class="chart-container" id="chart-cnh"></div>
+    </div>
 
     <script>
-        // 核心配置：你可以随时在这里添加几十个基金！
-        // baseIndex: 对应上面抓取的底层指数代码
-        // weight: 基金的平均仓位（通常QDII是0.95即95%）
-        const fundList = [
-            { name: "天弘纳斯达克100", baseIndex: "^NDX", weight: 0.95 },
-            { name: "广发纳斯达克100", baseIndex: "^NDX", weight: 0.94 },
-            { name: "景顺长城纳斯达克科技", baseIndex: "^NDX", weight: 0.95 }, // 严格来说跟踪科技指数，这里做演示
-            { name: "易方达标普信息科技", baseIndex: "^GSPC", weight: 0.95 }, // 演示：关联标普500
-            { name: "标普500等权重ETF (演示)", baseIndex: "^SPXEW", weight: 0.95 }
-        ];
+        // 存储 ECharts 实例以便后续更新
+        const charts = {};
 
-        // 刷新数据的核心函数
+        // 初始化图表配置
+        function initChart(domId, title) {
+            const chart = echarts.init(document.getElementById(domId), 'dark', { background: 'transparent' });
+            chart.setOption({
+                title: { text: title, textStyle: { fontSize: 14, color: '#aaa' }, left: 'center' },
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                grid: { left: '10%', right: '5%', bottom: '15%', top: '15%' },
+                xAxis: { type: 'category', data: [], scale: true, boundaryGap: false, axisLine: { onZero: false }, splitLine: { show: false } },
+                yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#333' } } },
+                series: [{
+                    type: 'candlestick', // 画 K 线图
+                    data: [],
+                    itemStyle: { color: '#00e676', color0: '#ff4d4f', borderColor: '#00e676', borderColor0: '#ff4d4f' } // 绿涨红跌(美股习惯)
+                }]
+            });
+            charts[domId] = chart;
+        }
+
+        initChart('chart-ndx', '纳斯达克100 盘中走势');
+        initChart('chart-spx', '标普500 盘中走势');
+        initChart('chart-spxew', '标普500等权重 盘中走势');
+        initChart('chart-cnh', '离岸人民币(USD/CNH)走势'); // 汇率通常用折线图更好，这里统一用 K线演示
+
         async function fetchMarketData() {
             try {
-                // 请求我们自己部署在 Vercel 上的 API
                 const res = await fetch('/api/market');
                 const result = await res.json();
                 const market = result.data;
 
-                document.getElementById('updateTime').innerHTML = `美股盘中，最后更新于 ${result.updateTime} (1分钟自动刷新)`;
+                document.getElementById('updateTime').innerHTML = `数据最后更新于 ${result.updateTime} (自动刷新)`;
 
-                // 1. 渲染顶部指数
-                const renderIndex = (id, symbol) => {
-                    const el = document.getElementById(id);
-                    const change = parseFloat(market[symbol].change);
-                    const color = change >= 0 ? 'up' : 'down';
-                    const sign = change > 0 ? '+' : '';
-                    el.innerHTML = `<span class="${color}">${sign}${change}%</span>`;
-                };
-                renderIndex('val-ndx', '^NDX');
-                renderIndex('val-spx', '^GSPC');
-                renderIndex('val-spxew', '^SPXEW');
-                renderIndex('val-cny', 'CNH=X');
-                const cnyChange = parseFloat(market['CNH=X'].change);
-                let fundHtml = '';
-
-                fundList.forEach(fund => {
-                    // 核心估算公式：指数涨幅 * 仓位 + 汇率涨幅
-                    const indexChange = parseFloat(market[fund.baseIndex].change);
-                    let estChange = (indexChange * fund.weight) + cnyChange;
-                    
-                    const color = estChange >= 0 ? 'up' : 'down';
-                    const sign = estChange > 0 ? '+' : '';
-
-                    fundHtml += `
-                        <div class="fund-item">
-                            <span>${fund.name}</span>
-                            <span class="${color}">${sign}${estChange.toFixed(2)}% ></span>
-                        </div>
+                // 1. 更新顶部数值
+                const updateTopBox = (id, symbol) => {
+                    const data = market[symbol];
+                    const color = data.change >= 0 ? 'up' : 'down';
+                    const sign = data.change > 0 ? '+' : '';
+                    document.getElementById(id).innerHTML = `
+                        <span style="font-size: 16px; font-weight: bold;">${data.price}</span><br>
+                        <span class="${color}" style="font-size: 12px;">${sign}${data.change}%</span>
                     `;
-                });
+                };
+                updateTopBox('val-ixic', '^IXIC');
+                updateTopBox('val-ndx', '^NDX');
+                updateTopBox('val-spx', '^GSPC');
+                updateTopBox('val-spxew', '^SPXEW');
+                updateTopBox('val-cnh', 'CNH=X');
 
-                document.getElementById('fundContainer').innerHTML = fundHtml;
+                // 2. 更新图表数据
+                const updateChart = (domId, symbol) => {
+                    const trendData = market[symbol].trend;
+                    const times = trendData.map(item => item[0]);
+                    const klines = trendData.map(item => [item[1], item[2], item[3], item[4]]); // O, C, L, H
+                    
+                    charts[domId].setOption({
+                        xAxis: { data: times },
+                        series: [{ data: klines }]
+                    });
+                };
+                updateChart('chart-ndx', '^NDX');
+                updateChart('chart-spx', '^GSPC');
+                updateChart('chart-spxew', '^SPXEW');
+                updateChart('chart-cnh', 'CNH=X');
 
             } catch (err) {
                 console.error("刷新失败", err);
             }
         }
 
-        // 页面加载先执行一次
         fetchMarketData();
-        // 设置定时器，每 60,000 毫秒（1分钟）自动拉取一次数据！
-        setInterval(fetchMarketData, 60000);
-
+        setInterval(fetchMarketData, 60000); // 1分钟刷新
+        
+        // 随窗口缩放自适应图表
+        window.addEventListener('resize', () => { Object.values(charts).forEach(c => c.resize()); });
     </script>
 </body>
 </html>
