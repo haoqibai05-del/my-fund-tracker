@@ -69,6 +69,7 @@
                 series: [{
                     type: 'candlestick',
                     data: [],
+                    // 国内习惯：红涨绿跌
                     itemStyle: { color: '#ff4d4f', borderColor: '#ff4d4f', color0: '#00e676', borderColor0: '#00e676' }
                 }]
             });
@@ -84,8 +85,8 @@
         const fundConfigs = [
             { 
                 name: '华宝纳斯达克精选', 
-                baseIndex: '^NDX', // 未公开仓位将用此指数拟合
-                totalWeight: 0.92, // 股票总仓位约 92%
+                baseIndex: '^NDX', 
+                totalWeight: 0.92, 
                 holdings: [
                     { symbol: 'NFLX', weight: 0.0932 }, 
                     { symbol: 'NVDA', weight: 0.0928 }, 
@@ -96,7 +97,7 @@
             },
             { 
                 name: '易方达全球成长精选', 
-                baseIndex: '^GSPC', // 其科技持仓较杂，用标普500作为基准拟合剩余仓位更平稳
+                baseIndex: '^GSPC', 
                 totalWeight: 0.90,
                 holdings: [
                     { symbol: 'TSM', weight: 0.0888 }, 
@@ -108,7 +109,7 @@
             { 
                 name: '华夏全球科技先锋', 
                 baseIndex: '^NDX',
-                totalWeight: 0.88, // 股票总仓位约 88%
+                totalWeight: 0.88, 
                 holdings: [
                     { symbol: 'VIAV', weight: 0.0452 },
                     { symbol: 'GLW', weight: 0.0415 },
@@ -125,6 +126,12 @@
                 const res = await fetch('/api/market');
                 const result = await res.json();
                 
+                // 【前端防崩溃机制】如果获取数据异常，优雅显示报错信息
+                if (result.error || !result.data) {
+                    document.getElementById('updateTime').innerHTML = `<span style="color:#ff4d4f;">数据获取异常: ${result.error || 'API连接失败，请稍后重试'}</span>`;
+                    return; // 终止后续操作，防止页面死机黑屏
+                }
+                
                 const indices = result.data.indices;
                 const stocks = result.data.stocks;
 
@@ -132,6 +139,7 @@
 
                 const updateTopBox = (id, symbol) => {
                     const data = indices[symbol];
+                    if (!data) return;
                     const color = data.change >= 0 ? 'up' : 'down';
                     const sign = data.change > 0 ? '+' : '';
                     document.getElementById(id).innerHTML = `
@@ -146,7 +154,9 @@
                 updateTopBox('val-cnh', 'CNH=X');
 
                 const updateChart = (domId, symbol) => {
-                    const trendData = indices[symbol].trend;
+                    const data = indices[symbol];
+                    if (!data || !data.trend) return;
+                    const trendData = data.trend;
                     const times = trendData.map(item => item[0]);
                     const klines = trendData.map(item => [item[1], item[2], item[3], item[4]]);
                     charts[domId].setOption({ xAxis: { data: times }, series: [{ data: klines }] });
@@ -157,7 +167,7 @@
                 updateChart('chart-cnh', 'CNH=X');
 
                 // 渲染基金列表
-                const cnhChange = parseFloat(indices['CNH=X'].change);
+                const cnhChange = indices['CNH=X'] ? parseFloat(indices['CNH=X'].change) : 0;
                 let fundHtml = '';
 
                 fundConfigs.forEach(fund => {
@@ -204,6 +214,7 @@
 
             } catch (err) {
                 console.error("刷新失败", err);
+                document.getElementById('updateTime').innerHTML = `<span style="color:#ff4d4f;">网络异常或跨域阻止，无法连接数据源</span>`;
             }
         }
 
