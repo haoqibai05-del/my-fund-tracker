@@ -64,10 +64,8 @@
                 renderIndex('val-ndx', '^NDX');
                 renderIndex('val-spx', '^GSPC');
                 renderIndex('val-spxew', '^SPXEW');
-                renderIndex('val-cny', 'CNY=X');
-
-                // 2. 渲染基金列表（批量计算估值）
-                const cnyChange = parseFloat(market['CNY=X'].change);
+                renderIndex('val-cny', 'CNH=X');
+                const cnyChange = parseFloat(market['CNH=X'].change);
                 let fundHtml = '';
 
                 fundList.forEach(fund => {

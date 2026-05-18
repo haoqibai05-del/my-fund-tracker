@@ -1,7 +1,7 @@
 // api/market.js
 export default async function handler(req, res) {
     // 我们需要抓取的底层指数：纳指100, 标普500, 标普500等权重, 人民币汇率
-    const symbols = ['^NDX', '^GSPC', '^SPXEW', 'CNY=X'];
+    const symbols = ['^NDX', '^GSPC', '^SPXEW', 'CNH=X'];
     const result = {};
 
     try {
