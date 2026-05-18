@@ -3,87 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>sntx的纳指标普行情实时更新</title>
+    <title>Pro行情看板 - 真实成分股版</title>
     <script src="https://cdn.staticfile.net/echarts/5.5.0/echarts.min.js"></script>
     <style>
-        body { 
-            font-family: -apple-system, sans-serif; 
-            background-color: #121212; 
-            color: #e0e0e0; 
-            margin: 0; 
-            padding: 15px; 
-        }
-        /* 顶部 5 格布局 */
-        .top-bar { 
-            display: grid; 
-            grid-template-columns: repeat(5, 1fr); 
-            gap: 10px; 
-            margin-bottom: 20px; 
-        }
-        .index-box { 
-            background: #1e1e1e; 
-            padding: 15px 5px; 
-            border-radius: 8px; 
-            text-align: center; 
-            font-size: 14px; 
-        }
-        .index-name { 
-            color: #888; 
-            font-size: 12px; 
-            margin-bottom: 5px; 
-        }
+        body { font-family: -apple-system, sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding: 15px; }
+        .top-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+        .index-box { background: #1e1e1e; padding: 15px 5px; border-radius: 8px; text-align: center; font-size: 14px; }
+        .index-name { color: #888; font-size: 12px; margin-bottom: 5px; }
         .up { color: #ff4d4f; }
         .down { color: #00e676; }
         
-        /* 图表网格布局：PC端一行两个，手机端一行一个 */
-        .charts-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-            gap: 15px; 
-        }
-        .chart-container { 
-            background: #1e1e1e; 
-            border-radius: 10px; 
-            padding: 10px; 
-            height: 300px; 
-        }
-        .time-hint { 
-            text-align: center; 
-            font-size: 12px; 
-            color: #888; 
-            margin-bottom: 15px; 
-        }
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .chart-container { background: #1e1e1e; border-radius: 10px; padding: 10px; height: 300px; }
+        .time-hint { text-align: center; font-size: 12px; color: #888; margin-bottom: 15px; }
 
-        /* 底部极简基金列表样式 */
-        .fund-section { 
-            margin-top: 30px; 
-            margin-bottom: 30px; 
-        }
-        .fund-list-container { 
-            display: flex; 
-            flex-direction: column; 
-            gap: 8px; 
-        }
+        .fund-section { margin-top: 30px; margin-bottom: 30px; }
+        .fund-list-container { display: flex; flex-direction: column; gap: 8px; }
         .fund-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #1e1e1e;
-            padding: 15px 12px;
-            border-radius: 4px;
-            border-left: 3px solid #333;
-            transition: all 0.3s;
+            display: flex; justify-content: space-between; align-items: center;
+            background: #1e1e1e; padding: 15px 12px; border-radius: 4px;
+            border-left: 3px solid #333; transition: all 0.3s;
         }
-        /* 红涨绿跌边框指示 */
         .fund-row.up { border-left-color: #ff4d4f; }
         .fund-row.down { border-left-color: #00e676; }
         .f-name { font-size: 15px; color: #ddd; font-weight: 500; }
-        .f-est { font-size: 16px; font-weight: bold; }
+        .f-desc { font-size: 12px; color: #666; margin-top: 4px; }
+        .f-est { font-size: 16px; font-weight: bold; text-align: right; }
     </style>
 </head>
 <body>
 
-    <div class="time-hint" id="updateTime">盘中数据加载中...</div>
+    <div class="time-hint" id="updateTime">真实持仓计算加载中...</div>
 
     <div class="top-bar" id="topIndices">
         <div class="index-box"><div class="index-name">纳指综合</div><div id="val-ixic">--</div></div>
@@ -106,10 +56,8 @@
     </div>
 
     <script>
-        // 存储 ECharts 实例以便后续更新
         const charts = {};
 
-        // 初始化图表配置
         function initChart(domId, title) {
             const chart = echarts.init(document.getElementById(domId), 'dark', { background: 'transparent' });
             chart.setOption({
@@ -121,13 +69,7 @@
                 series: [{
                     type: 'candlestick',
                     data: [],
-                    // 国内习惯：红涨绿跌
-                    itemStyle: { 
-                        color: '#ff4d4f', 
-                        borderColor: '#ff4d4f', 
-                        color0: '#00e676', 
-                        borderColor0: '#00e676' 
-                    }
+                    itemStyle: { color: '#ff4d4f', borderColor: '#ff4d4f', color0: '#00e676', borderColor0: '#00e676' }
                 }]
             });
             charts[domId] = chart;
@@ -138,33 +80,58 @@
         initChart('chart-spxew', '标普500等权重 盘中走势');
         initChart('chart-cnh', '离岸人民币(USD/CNH)走势');
 
-        // 基金配置库
+        // 【高精度成分股配置库】根据最新公开季报权重设定
         const fundConfigs = [
-            { name: '华宝纳斯达克精选', index: '^NDX', weight: 0.95 },
-            { name: '浦银安盛全球智能科技', index: '^NDX', weight: 0.95 },
-            { name: '广发全球精选', index: '^NDX', weight: 0.95 },
-            { name: '嘉实全球产业升级', index: '^NDX', weight: 0.95 },
-            { name: '嘉实美国成长', index: '^GSPC', weight: 0.95 },
-            { name: '易方达标普信息科技', index: '^NDX', weight: 0.95 },
-            { name: '易方达全球成长精选', index: '^NDX', weight: 0.95 },
-            { name: '国富全球科技', index: '^NDX', weight: 0.95 },
-            { name: '建信新兴市场混合', index: '^GSPC', weight: 0.60 },
-            { name: '汇添富全球移动互联', index: '^NDX', weight: 0.95 },
-            { name: '华夏全球科技先锋', index: '^NDX', weight: 0.95 },
-            { name: '标普500等权重ETF (演示)', index: '^SPXEW', weight: 1.00 }
+            { 
+                name: '华宝纳斯达克精选', 
+                baseIndex: '^NDX', // 未公开仓位将用此指数拟合
+                totalWeight: 0.92, // 股票总仓位约 92%
+                holdings: [
+                    { symbol: 'NFLX', weight: 0.0932 }, 
+                    { symbol: 'NVDA', weight: 0.0928 }, 
+                    { symbol: 'AAPL', weight: 0.0776 },
+                    { symbol: 'MSFT', weight: 0.0750 },
+                    { symbol: 'AVGO', weight: 0.0743 }
+                ]
+            },
+            { 
+                name: '易方达全球成长精选', 
+                baseIndex: '^GSPC', // 其科技持仓较杂，用标普500作为基准拟合剩余仓位更平稳
+                totalWeight: 0.90,
+                holdings: [
+                    { symbol: 'TSM', weight: 0.0888 }, 
+                    { symbol: 'LITE', weight: 0.0868 },
+                    { symbol: 'GLW', weight: 0.0467 },
+                    { symbol: 'GOOGL', weight: 0.0336 }
+                ]
+            },
+            { 
+                name: '华夏全球科技先锋', 
+                baseIndex: '^NDX',
+                totalWeight: 0.88, // 股票总仓位约 88%
+                holdings: [
+                    { symbol: 'VIAV', weight: 0.0452 },
+                    { symbol: 'GLW', weight: 0.0415 },
+                    { symbol: 'WDC', weight: 0.0266 },
+                    { symbol: 'MU', weight: 0.0230 },
+                    { symbol: 'AEIS', weight: 0.0163 },
+                    { symbol: 'TER', weight: 0.0162 }
+                ]
+            }
         ];
 
         async function fetchMarketData() {
             try {
                 const res = await fetch('/api/market');
                 const result = await res.json();
-                const market = result.data;
+                
+                const indices = result.data.indices;
+                const stocks = result.data.stocks;
 
-                document.getElementById('updateTime').innerHTML = `数据最后更新于 ${result.updateTime} (自动刷新)`;
+                document.getElementById('updateTime').innerHTML = `穿透底层成分股高精度计算，最后更新于 ${result.updateTime}`;
 
-                // 1. 更新顶部数值
                 const updateTopBox = (id, symbol) => {
-                    const data = market[symbol];
+                    const data = indices[symbol];
                     const color = data.change >= 0 ? 'up' : 'down';
                     const sign = data.change > 0 ? '+' : '';
                     document.getElementById(id).innerHTML = `
@@ -178,9 +145,8 @@
                 updateTopBox('val-spxew', '^SPXEW');
                 updateTopBox('val-cnh', 'CNH=X');
 
-                // 2. 更新图表数据
                 const updateChart = (domId, symbol) => {
-                    const trendData = market[symbol].trend;
+                    const trendData = indices[symbol].trend;
                     const times = trendData.map(item => item[0]);
                     const klines = trendData.map(item => [item[1], item[2], item[3], item[4]]);
                     charts[domId].setOption({ xAxis: { data: times }, series: [{ data: klines }] });
@@ -190,26 +156,48 @@
                 updateChart('chart-spxew', '^SPXEW');
                 updateChart('chart-cnh', 'CNH=X');
 
-                // 3. 渲染底部基金列表
-                const cnhChange = parseFloat(market['CNH=X'].change);
+                // 渲染基金列表
+                const cnhChange = parseFloat(indices['CNH=X'].change);
                 let fundHtml = '';
 
                 fundConfigs.forEach(fund => {
-                    const idxData = market[fund.index];
-                    if(idxData) {
-                        const idxChange = parseFloat(idxData.change);
-                        // 计算估值涨跌幅
-                        const estChange = (idxChange * fund.weight) + cnhChange;
-                        const colorCls = estChange >= 0 ? 'up' : 'down';
-                        const sign = estChange > 0 ? '+' : '';
-                        
-                        fundHtml += `
-                            <div class="fund-row ${colorCls}">
-                                <div class="f-name">${fund.name}</div>
-                                <div class="f-est ${colorCls}">${sign}${estChange.toFixed(2)}%</div>
-                            </div>
-                        `;
+                    let stockContribution = 0;
+                    let knownWeight = 0;
+
+                    // 1. 已知重仓股涨跌贡献
+                    fund.holdings.forEach(h => {
+                        const stockData = stocks[h.symbol];
+                        if(stockData) {
+                            stockContribution += stockData.change * h.weight;
+                            knownWeight += h.weight;
+                        }
+                    });
+
+                    // 2. 隐蔽仓位拟合贡献
+                    const remainWeight = fund.totalWeight - knownWeight;
+                    let indexContribution = 0;
+                    if(remainWeight > 0 && indices[fund.baseIndex]) {
+                        indexContribution = indices[fund.baseIndex].change * remainWeight;
                     }
+
+                    // 3. 估算涨跌幅 = 个股贡献 + 隐蔽仓位贡献 + 汇率涨跌幅
+                    const estChange = stockContribution + indexContribution + cnhChange;
+                    
+                    const colorCls = estChange >= 0 ? 'up' : 'down';
+                    const sign = estChange > 0 ? '+' : '';
+                    
+                    // 显示被穿透的重仓股用于核验
+                    const displayHoldings = fund.holdings.map(h => h.symbol).join(', ');
+
+                    fundHtml += `
+                        <div class="fund-row ${colorCls}">
+                            <div>
+                                <div class="f-name">${fund.name}</div>
+                                <div class="f-desc">穿透计算: ${displayHoldings} 等</div>
+                            </div>
+                            <div class="f-est ${colorCls}">${sign}${estChange.toFixed(2)}%</div>
+                        </div>
+                    `;
                 });
                 
                 document.getElementById('fundTable').innerHTML = fundHtml;
@@ -219,12 +207,8 @@
             }
         }
 
-        // 页面加载先执行一次
         fetchMarketData();
-        // 设置定时器，每 60,000 毫秒（1分钟）自动拉取一次数据
         setInterval(fetchMarketData, 60000); 
-        
-        // 随窗口缩放自适应图表
         window.addEventListener('resize', () => { Object.values(charts).forEach(c => c.resize()); });
     </script>
 </body>
