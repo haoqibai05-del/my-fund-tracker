@@ -1,18 +1,18 @@
 {
-  "updateTime": "2026-05-18 22:30:00",
+  "updateTime": "2026-05-18 23:09:14",
   "nasdaq100": {
     "name": "纳斯达克 100",
-    "points": 18500.50,
-    "changePercent": 1.25
+    "points": 28955.15,
+    "changePercent": -0.58
   },
   "sp500ew": {
     "name": "标普 500 等权重",
-    "points": 7200.10,
-    "changePercent": 0.85
+    "points": 8205.59,
+    "changePercent": 0.61
   },
   "exchangeRate": {
     "name": "USD/CNY 汇率",
-    "points": 7.2345,
-    "changePercent": -0.12
+    "points": 6.8,
+    "changePercent": 0.21
   }
 }
